@@ -140,11 +140,11 @@ struct Config
         int nbreak{0};
         for (int i = 0; i < filesize; ++i)
         {
-            if (buf[i] == ',')
+            if (buf[i] == field_delimiter)
             {
                 ++ndelim;
             }
-            else if (buf[i] == '\n')
+            else if (buf[i] == line_terminator)
             {
                 ++nbreak;
                 line.push_back({cur, beg + static_cast<std::fstream::pos_type>(i)});
