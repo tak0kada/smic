@@ -8,6 +8,7 @@
 #include <memory>
 #include <algorithm>
 #include <cstdlib>
+#include "print.hpp"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
@@ -17,42 +18,6 @@
 namespace py = pybind11;
 
 // #include <eigen3/Eigen/Core>
-
-std::vector<double> split(
-        const std::string& data, const char field_delimiter, const int ncol,
-        const std::vector<int>& col_idx)
-{
-    std::vector<double> ret;
-    ret.resize(ncol);
-
-    std::string val{};
-    int i{0}; // pointer to return vector
-    int j{0}; // pointer to current position
-    for (const auto& c: data)
-    {
-        if (j != col_idx[i])
-        {
-            if (c != field_delimiter)
-                continue;
-            else
-            {
-                ++j;
-                continue;
-            }
-        }
-        if (c != field_delimiter)
-            val += c;
-        else
-        {
-            ret[i] = std::stod(val);
-            val = "";
-            ++i;
-            ++j;
-        }
-    }
-    ret[i] = std::stod(val);
-    return ret;
-}
 
 struct Mask
 {
@@ -108,51 +73,59 @@ struct Config
         if (ifs.fail())
             throw std::runtime_error("Failed to open " + filename);
 
+        // if blank
+        ifs.seekg(0, std::ios::end);
+        auto eof = ifs.tellg();
+        ifs.seekg(0, std::ios::beg);
+        if (eof == 1)
+            return;
+
         // skip BOM
-        std::array<char, 3> BOM;
-        try
+        std::fstream::pos_type beg;
+        if (eof > 3)
         {
+            std::array<char, 3> BOM;
             for (auto& b: BOM)
                 ifs.get(b);
+            if (BOM[0] == (char)0xEF && BOM[1] == (char)0xBB && BOM[2] == (char)0xBF)
+                ifs.seekg(3, std::ios::beg);
+            else
+                ifs.seekg(0, std::ios::beg);
         }
-        catch (const std::runtime_error& e)
-        {
-            std::cout << e.what() << std::endl;
-            std::exit(1);
-        }
-        if (BOM[0] == (char)0xEF && BOM[1] == (char)0xBB && BOM[2] == (char)0xBF)
-            ifs.seekg(3, std::ios::beg);
-        else
-            ifs.seekg(0, std::ios::beg);
-        auto beg = ifs.tellg();
 
-        // load all data to memory
-        ifs.seekg(0, std::ios::end);
-        int filesize = ifs.tellg() - beg;
-        auto buf = std::make_unique<char[]>(filesize);
-        buf[filesize] = '\0';
-        ifs.seekg(beg);
-        auto cur = beg;
-        ifs.read(buf.get(), filesize);
-
-        // build config
-        int ndelim{0};
-        int nbreak{0};
-        for (int i = 0; i < filesize; ++i)
+        ++ncol_file;
+        for (std::size_t i = 0; i < static_cast<std::size_t>(eof); ++i)
         {
+<<<<<<< HEAD
+            ifs.seekg(i, std::ios::beg);
+            char c = ifs.get();
+            if (c == field_delimiter)
+=======
             if (buf[i] == field_delimiter)
+>>>>>>> 4bc8d5895bb2f21c07b23f562446f2ab4d9ad53f
             {
-                ++ndelim;
+                ++ncol_file;
+                continue;
             }
+<<<<<<< HEAD
+            if (c == line_terminator)
+=======
             else if (buf[i] == line_terminator)
+>>>>>>> 4bc8d5895bb2f21c07b23f562446f2ab4d9ad53f
             {
-                ++nbreak;
-                line.push_back({cur, beg + static_cast<std::fstream::pos_type>(i)});
-                cur = beg + static_cast<std::fstream::pos_type>(i + 1);
+                ++nrow_file;
+                line.push_back({beg, ifs.tellg()});
+                beg = ifs.tellg();
+                while (ifs.ignore(std::numeric_limits<std::streamsize>::max(), line_terminator))
+                {
+                    line.push_back({beg, ifs.tellg()});
+                    beg = ifs.tellg();
+                    ++nrow_file;
+                }
+                --nrow_file;
+                break;
             }
         }
-        ncol_file = ndelim / nbreak + 1;
-        nrow_file = nbreak;
     }
 
     std::string filename;
@@ -166,6 +139,42 @@ struct Config
     std::vector<int> skiprows;
     std::vector<int> skipcols;
 };
+
+std::vector<double> split(const int id, const Config& config,
+        int ncol, const std::vector<int>& col_idx)
+{
+    std::vector<double> ret;
+    ret.resize(ncol);
+
+    std::ifstream ifs{config.filename};
+    const auto beg{config.line[id].first};
+    const auto end{config.line[id].second};
+    ifs.seekg(beg);
+    if (ifs.fail())
+        throw std::runtime_error("Failed to open " + config.filename);
+
+    double val{0};
+    int i{0}; // pointer to return vector
+    int j{0}; // pointer to current position
+    for (i = 0; i < ncol;)
+    {
+        ifs >> val;
+        ifs.ignore();
+
+        if (j != col_idx[i])
+        {
+            ++j;
+            continue;
+        }
+        else
+        {
+            ret[i] = val;
+            ++i;
+            ++j;
+        }
+    }
+    return ret;
+}
 
 // using RowMatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 // RowMatrixXd load_csv(const std::string fname,
@@ -202,7 +211,7 @@ struct Config
 //     return X;
 // }
 
-inline py::array_t<double> load_csv(const std::string& fname,
+py::array_t<double> load_csv(const std::string& fname,
          const char delimiter = ',', char line_terminator = '\n',
          const std::vector<int>& skiprows = {}, const std::vector<int>& skipcols = {})
 {
@@ -221,28 +230,21 @@ inline py::array_t<double> load_csv(const std::string& fname,
     for (int i = 0; i < nrow; ++i)
     {
         int idx = mask.row_idx[i];
-        const auto [beg, end] = config.line[idx];
-        const int length = end - beg;
-
-        std::ifstream ifs(fname);
-        std::string buf(length, ' ');
-        ifs.seekg(beg, std::ios::beg);
-        ifs.read(&buf[0], length);
 
         std::unique_ptr<std::vector<double>> data;
         try
         {
-            const auto data = split(buf, config.field_delimiter, ncol, mask.col_idx);
+            const auto data = split(idx, config, ncol, mask.col_idx);
             for (int j = 0; j < ncol; ++j)
-            {
                 ref(i, j) = data[j];
-            }
         }
-        catch (const std::invalid_argument& e)
+        catch (const std::exception& e)
         {
             # pragma omp critical
-            std::cout << "Error occurred in OpenMP loop, as shown below." << std::endl;
-            std::cout << e.what() << std::endl;
+            {
+                std::cout << "Error occurred in OpenMP loop, as shown below." << std::endl;
+                std::cout << e.what() << std::endl;
+            }
             error_in_loop = true;
         }
     }
