@@ -96,22 +96,14 @@ struct Config
         ++ncol_file;
         for (std::size_t i = 0; i < static_cast<std::size_t>(eof); ++i)
         {
-<<<<<<< HEAD
             ifs.seekg(i, std::ios::beg);
             char c = ifs.get();
             if (c == field_delimiter)
-=======
-            if (buf[i] == field_delimiter)
->>>>>>> 4bc8d5895bb2f21c07b23f562446f2ab4d9ad53f
             {
                 ++ncol_file;
                 continue;
             }
-<<<<<<< HEAD
             if (c == line_terminator)
-=======
-            else if (buf[i] == line_terminator)
->>>>>>> 4bc8d5895bb2f21c07b23f562446f2ab4d9ad53f
             {
                 ++nrow_file;
                 line.push_back({beg, ifs.tellg()});
@@ -211,7 +203,7 @@ std::vector<double> split(const int id, const Config& config,
 //     return X;
 // }
 
-py::array_t<double> load_csv(const std::string& fname,
+py::array_t<double> load_csv(const std::string fname,
          const char delimiter = ',', char line_terminator = '\n',
          const std::vector<int>& skiprows = {}, const std::vector<int>& skipcols = {})
 {
