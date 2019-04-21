@@ -105,7 +105,6 @@ struct Config
             }
             if (c == line_terminator)
             {
-                ++nrow_file;
                 line.push_back({beg, ifs.tellg()});
                 beg = ifs.tellg();
                 while (ifs.ignore(std::numeric_limits<std::streamsize>::max(), line_terminator))
@@ -114,7 +113,6 @@ struct Config
                     beg = ifs.tellg();
                     ++nrow_file;
                 }
-                --nrow_file;
                 break;
             }
         }
